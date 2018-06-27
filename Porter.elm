@@ -102,14 +102,15 @@ type Msg req res msg
 {-| Internal type used by requests that have a response handler.
 -}
 type RequestWithHandler req res msg
-    = RequestWithHandler req (List (res -> Request req res)) (res -> msg)
+    = RequestWithHandler req (List (res -> RequestWithHandler req res res)) (res -> msg)
 
 
 {-| Opaque type of a 'request'. Use the `request` function to create one,
 chain them using `andThen` and finally send it using `send`.
 -}
-type Request req res
-    = Request req (List (res -> Request req res))
+type alias Request req res
+    -- = Request req (List (res -> Request req res))
+    = RequestWithHandler req res res
 
 
 {-| Subscribe to messages from ports.
@@ -125,22 +126,22 @@ and that can be combined using `andThen`.
 -}
 request : req -> Request req res
 request req =
-    Request req []
+    RequestWithHandler req [] identity
 
 
 {-| Chains two Porter requests together:
 Run a second one right away when the first returns using its result in the request.
 -}
 andThen : (res -> Request req res) -> Request req res -> Request req res
-andThen reqfun (Request initial_req reqfuns) =
-    Request initial_req (reqfun :: reqfuns)
+andThen reqfun (RequestWithHandler initial_req reqfuns responseFun) =
+    RequestWithHandler initial_req (reqfun :: reqfuns) responseFun
 
 
 {-| Sends a request earlier started using `request`.
 -}
 send: Config req res msg -> (res -> msg) -> Request req res -> Cmd msg
-send config response_handler (Request req reqfuns) =
-    runSendRequest config (RequestWithHandler req (List.reverse reqfuns) response_handler)
+send config response_handler (RequestWithHandler req reqfuns responseFun) =
+    runSendRequest config (RequestWithHandler req (List.reverse reqfuns) (responseFun >> response_handler))
 
 
 {-| Internal function that performs the specified request as a command.
@@ -237,10 +238,10 @@ handleResponse config (Model model) id res (RequestWithHandler msg mappers final
                 request =
                     mapper res
 
-                extractMsg (Request msg _) =
+                extractMsg (RequestWithHandler msg _ _) =
                     msg
 
-                extractMappers (Request _ reqMappers) =
+                extractMappers (RequestWithHandler _ reqMappers _) =
                     reqMappers
             in
                 ( Model { model | handlers = Dict.remove id model.handlers }
