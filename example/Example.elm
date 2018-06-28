@@ -37,6 +37,7 @@ type alias Model =
     { porter : Porter.Model String String Msg
     , response : String
     , advancedResponse : String
+    , mapResponse : String
     }
 
 
@@ -45,20 +46,26 @@ init =
     ( { porter = Porter.init
       , response = ""
       , advancedResponse = ""
+      , mapResponse = ""
       }
     , Cmd.batch
         [ -- Send a request through porter, specifying the response handler directly
-          Porter.send porterConfig Receive (Porter.request "Reverse me!")
+          -- Porter.send porterConfig Receive (Porter.request "Reverse me!")
 
         -- Or send multiple requests one after the other:
-        , Porter.request ("Reverse me too!")
-            |> Porter.andThen (\reversedStr -> Porter.request (reversedStr ++ " The Quick Brown Fox!"))
-            |> Porter.andThen (\reversedStr -> Porter.request (reversedStr ++ " A man a plan a canal: panama"))
-            |> Porter.send porterConfig ReceiveAdvanced
+        -- , Porter.request ("Reverse me too!")
+        --     |> Porter.andThen (\reversedStr -> Porter.request (reversedStr ++ " The Quick Brown Fox!"))
+        --     |> Porter.andThen (\reversedStr -> Porter.request (reversedStr ++ " A man a plan a canal: panama"))
+        --     |> Porter.map (\str -> String.repeat 2 str)
+        --     |> Porter.send porterConfig ReceiveAdvanced
+         combinedRequest
+          |> Porter.send porterConfig ReceiveMapped
         ]
     )
 
-
+req1 = Porter.request "Foo"
+req2 = Porter.request "Bar"
+combinedRequest = Porter.map2 (\a b -> a ++ " | " ++ b) req2 req1
 
 -- Message includes Porter's message
 
@@ -67,6 +74,7 @@ type Msg
     = PorterMsg (Porter.Msg String String Msg)
     | Receive String
     | ReceiveAdvanced String
+    | ReceiveMapped String
 
 
 
@@ -88,6 +96,8 @@ update msg model =
 
         ReceiveAdvanced response ->
             ( { model | advancedResponse = response }, Cmd.none )
+        ReceiveMapped response ->
+            ( { model | mapResponse = response }, Cmd.none )
 
 
 

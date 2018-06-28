@@ -10,6 +10,9 @@ module Porter
         , send
         , request
         , andThen
+        , map
+        , map2
+        , map3
         )
 
 {-| Port message manager to emulate a request-response style communication through ports, a'la `Http.send ResponseHandler request`.
@@ -28,6 +31,10 @@ module Porter
 
 @docs Request
 @docs request, andThen, send
+
+# Modify received responses before turning them back into messages
+
+@docs map, map2, map3
 
 
 
@@ -135,6 +142,22 @@ Run a second one right away when the first returns using its result in the reque
 andThen : (res -> Request req res) -> Request req res -> Request req res
 andThen reqfun (RequestWithHandler initial_req reqfuns responseFun) =
     RequestWithHandler initial_req (reqfun :: reqfuns) responseFun
+
+
+map : (res -> res) -> Request req res -> Request req res
+map func (RequestWithHandler request reqfuns responseFun) =
+    RequestWithHandler request reqfuns (responseFun >> func)
+
+map2 : (res -> res -> res) -> Request req res -> Request req res -> Request req res
+map2 func resA resB =
+    resA
+        |> andThen (\a -> map (func a) resB)
+
+
+map3 : (res -> res -> res -> res) -> Request req res -> Request req res -> Request req res -> Request req res
+map3 func resA resB resC =
+    resA
+        |> andThen (\a -> map2 (func a) resB resC)
 
 
 {-| Sends a request earlier started using `request`.
